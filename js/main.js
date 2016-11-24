@@ -3,17 +3,31 @@
  */
 (function () {
     var Util = (function () {
-            var prefix = 'html5_reader_';
-            var StorageGetter = function (key) {
-                return localStorage.getItem(prefix + key);
-            };
-            var StorageSetter = function (key,val) {
-                return localStorage.setItem(prefix + key,val);
-            };
-            return{
-                StorageGetter:StorageGetter,
-                StorageSetter:StorageSetter
-            }
+        var prefix = 'html5_reader_';
+        var StorageGetter = function (key) {
+            return localStorage.getItem(prefix + key);
+        };
+        var StorageSetter = function (key,val) {
+            return localStorage.setItem(prefix + key,val);
+        };
+
+        var getBSONP = function(url,callback){
+            return $.jsonp({
+                url:url,
+                cache:true,
+                callback:'duokan_fiction_chapter',
+                success:function(result){
+                    var data = $.base64.decode(result);
+                    var json = decodeURIComponent(escape(data));
+                    callback(json);
+                }
+            })
+        };
+        return{
+            getBSONP:getBSONP,
+            StorageGetter:StorageGetter,
+            StorageSetter:StorageSetter
+        }
     })();
 
     var Dom = {
@@ -38,23 +52,93 @@
     var initFontSize = Util.StorageGetter('font-size')||14;
     initFontSize = parseInt(initFontSize);
     Dom.ReadContent.css('font-size',initFontSize);
+    var readerModel;
+    var readerUI;
 
-    function main(func) {
+    function main() {
         /*项目入口函数*/
-        func();
+
+        readerModel = ReaderModel();
+        readerUI = ReaderBaseFrame(Dom.ReadContent);
+        readerModel.init(function(data){
+            readerUI(data);
+        });
+        EventHandler();
+
     }
 
     function ReaderModel() {
         /*实现和阅读器相关的数据交互的方法*/
-        var getFictionInfo = function () {
-            $.get('/data/chapter.json',function () {
 
-            },'json');
+        var Chapter_id;
+        var ChapterTotal;
+        var init = function(UIcallback){
+            getFictionInfo(function(){
+                getCurChapterContent(Chapter_id,function(data){
+                    UIcallback && UIcallback(data)
+                })
+            })
+        };
+        var getFictionInfo = function (callback) {
+            $.get('data/chapter.json',function (data) {
+                    /*获得章节信息的回调*/
+                Chapter_id = data.chapters[2].chapter_id;
+                ChapterTotal = data.chapters.length;
+                callback && callback();
+            },"json");
+        };
+
+        var getCurChapterContent = function (chapter_id,callback){
+            $.get('data/data' + chapter_id + '.json',function(data){
+                /*获得章节数据的回调*/
+                if(data.result == 0){
+                    var url = data.jsonp;
+                    Util.getBSONP(url,function(data){
+                       callback && callback(data);
+                    });
+                }
+            },"json")
+        };
+        var prevChapter = function(UIcallback){
+            Chapter_id = parseInt(Chapter_id,10);
+            if(Chapter_id == 0){
+                return
+            }
+            Chapter_id-=1;
+
+            getCurChapterContent(Chapter_id,UIcallback);
+        };
+        var nextChapter = function(UIcallback){
+            Chapter_id = parseInt(Chapter_id,10);
+            if(Chapter_id == ChapterTotal){
+                return
+            }
+            Chapter_id+=1;
+
+            getCurChapterContent(Chapter_id,UIcallback);
+
+        };
+        return{
+            init:init,
+            prevChapter:prevChapter,
+            nextChapter:nextChapter
         }
+
     }
 
-    function ReaderBaseFrame() {
+    function ReaderBaseFrame(container) {
         /*初始化基本的UI结构*/
+        function parseChapterData(jsonData){
+            var jasonObj = JSON.parse(jsonData);
+            var html='<h4>' + jasonObj.t + '</h4>';
+            for (var i = 0;i<jasonObj.p.length;i++){
+                html+='<p>' + jasonObj.p[i] + '</p>';
+            }
+            return html;
+        }
+        return function (data) {
+            container.html(parseChapterData(data));
+        }
     }
 
     function EventHandler() {
@@ -174,10 +258,22 @@
                 Dom.sun.hide();
             }
 
-        })
+        });
+        $('#prev_button').click(function(){
+            /*获得章节的翻页数据，然后把数据进行渲染*/
+            readerModel.prevChapter(function(data){
+                readerUI(data)
+            })
+        });
+        $('#next_button').click(function(){
+            readerModel.nextChapter(function(data){
+                readerUI(data)
+            })
+        });
+
 
     }
 
-    main(EventHandler);
+    main();
 
 })();
