@@ -2,6 +2,7 @@
  * Created by Administrator on 2016/11/24 0024.
  */
 (function () {
+    'use strict';
     var Util = (function () {
         var prefix = 'html5_reader_';
         var StorageGetter = function (key) {
@@ -73,19 +74,41 @@
         var Chapter_id;
         var ChapterTotal;
         var init = function(UIcallback){
-            getFictionInfo(function(){
+/*            getFictionInfo(function(){
                 getCurChapterContent(Chapter_id,function(data){
                     UIcallback && UIcallback(data)
                 })
+            })*/
+
+            /*使用promise对象改造了异步函数，使代码结构更加清晰*/
+            getFictionInfoPromise().then(function (d) {
+                return getgetCurChapterContentPromise();
+            }).then(function (data) {
+                UIcallback && UIcallback(data);
             })
         };
         var getFictionInfo = function (callback) {
             $.get('data/chapter.json',function (data) {
                     /*获得章节信息的回调*/
-                Chapter_id = data.chapters[2].chapter_id;
+                Chapter_id = Util.StorageGetter('last_chapter_id')||data.chapters[1].chapter_id;
                 ChapterTotal = data.chapters.length;
                 callback && callback();
             },"json");
+        };
+
+        var getFictionInfoPromise =function () {
+            return new Promise(function (resolve,reject) {
+                $.get('data/chapter.json',function (data) {
+                    /*获得章节信息的回调*/
+                    if(data.result == 0){
+                        Chapter_id = Util.StorageGetter('last_chapter_id')||data.chapters[1].chapter_id;
+                        ChapterTotal = data.chapters.length;
+                        resolve();
+                    }else {
+                        reject();
+                    }
+                },"json");
+            });
         };
 
         var getCurChapterContent = function (chapter_id,callback){
@@ -99,23 +122,44 @@
                 }
             },"json")
         };
+
+        var getgetCurChapterContentPromise =function(){
+            return new Promise (function (resolve,reject) {
+                $.get('data/data' + Chapter_id + '.json',function(data){
+                    /*获得章节数据的回调*/
+                    if(data.result == 0){
+                        var url = data.jsonp;
+                        Util.getBSONP(url,function(data){
+                            resolve(data);
+                        })
+                    }else {
+                        reject({msg:'fail'});
+                    }
+                },"json")
+            })
+        };
         var prevChapter = function(UIcallback){
             Chapter_id = parseInt(Chapter_id,10);
-            if(Chapter_id == 0){
+            if(Chapter_id == 1){
+                alert('这已经是第一章了哦');
                 return
             }
             Chapter_id-=1;
 
             getCurChapterContent(Chapter_id,UIcallback);
+            Util.StorageSetter('last_chapter_id',Chapter_id);
         };
         var nextChapter = function(UIcallback){
             Chapter_id = parseInt(Chapter_id,10);
-            if(Chapter_id == ChapterTotal){
-                return
+            if(Chapter_id == 4){
+                alert('这已经是最后一章了哦');
+                return;
+            }else {
+                Chapter_id+=1;
+                getCurChapterContent(Chapter_id,UIcallback);
+                Util.StorageSetter('last_chapter_id',Chapter_id);
             }
-            Chapter_id+=1;
 
-            getCurChapterContent(Chapter_id,UIcallback);
 
         };
         return{
@@ -263,12 +307,14 @@
             /*获得章节的翻页数据，然后把数据进行渲染*/
             readerModel.prevChapter(function(data){
                 readerUI(data)
-            })
+            });
+            $("html, body").animate({ scrollTop: 0 },0);
         });
         $('#next_button').click(function(){
             readerModel.nextChapter(function(data){
                 readerUI(data)
-            })
+            });
+            $("html, body").animate({ scrollTop: 0 },0);
         });
 
 
