@@ -58,7 +58,7 @@
 
     function main() {
         /*项目入口函数*/
-
+        alert('请在浏览器的手机模式下查看哦^_^');
         readerModel = ReaderModel();
         readerUI = ReaderBaseFrame(Dom.ReadContent);
         readerModel.init(function(data){
