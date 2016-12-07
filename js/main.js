@@ -316,7 +316,9 @@
             });
             $("html, body").animate({ scrollTop: 0 },0);
         });
-
+        $('#menu_switch').click(function () {
+            alert('暂时还没有其他章节哦')
+        })
 
     }
 
